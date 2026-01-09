@@ -1168,6 +1168,11 @@ function openCamera() {
     alert('Función de cámara próximamente');
 }
 
+// ==================== UTILIDADES ====================
+function validEmailFormat(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 // ==================== BÚSQUEDA DE USUARIOS ====================
 document.addEventListener('DOMContentLoaded', () => {
     // Configurar búsqueda de usuarios

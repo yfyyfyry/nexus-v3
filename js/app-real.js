@@ -528,14 +528,20 @@ async function renderHome() {
             return;
         }
         
+        // Obtener lista de amigos (usuarios que sigues)
+        const friends = await getFriendsList();
+        console.log('Amigos encontrados:', friends);
+        
         container.innerHTML = videos.map(video => {
             const isOwnVideo = video.author === (user ? user.email : null);
             const likesCount = video.likes ? video.likes.length : 0;
             const commentsCount = video.comments ? video.comments.length : 0;
             const isLiked = user && user.email !== 'guest@nexus.local' && video.likes && video.likes.includes(user.email);
+            const isFromFriend = friends.includes(video.author);
             
             return `
-                <div class="video-card">
+                <div class="video-card ${isFromFriend ? 'friend-video' : ''}">
+                    ${isFromFriend ? '<div class="friend-badge">👥 Amigo</div>' : ''}
                     <video src="${video.videoUrl}" controls preload="metadata"></video>
                     <div class="v-body">
                         <div class="avatar-v" style="background:${video.authorColor || '#333'}">
@@ -550,7 +556,7 @@ async function renderHome() {
                         ${isOwnVideo ? 
                             `<button class="del-btn-mini" onclick="deleteVideo(${video.id})">Borrar</button>` : 
                             `<button onclick="followUser('${video.author}')" style="background:var(--blue); color:white; border:none; padding:6px 15px; border-radius:10px; font-weight:600; font-size:12px">
-                                Siguiendo
+                                ${friends.includes(video.author) ? 'Siguiendo' : 'Seguir'}
                             </button>`
                         }
                     </div>
@@ -569,6 +575,17 @@ async function renderHome() {
                             </button>
                         </div>
                     </div>
+                    <!-- Comentarios visibles -->
+                    <div class="comments-section">
+                        <div class="comments-header" onclick="toggleComments(${video.id})">
+                            <i class="fas fa-comments"></i>
+                            <span>Comentarios (${formatNumber(commentsCount)})</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                        <div class="comments-list" id="comments-${video.id}" style="display: none;">
+                            ${renderVideoComments(video.comments || [])}
+                        </div>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -579,6 +596,58 @@ async function renderHome() {
         console.error('Error cargando videos:', error);
         const container = document.getElementById('homePage');
         container.innerHTML = '<div style="text-align: center; padding: 50px; color: #ff3b30;">Error cargando videos. Recarga la página.</div>';
+    }
+}
+
+// Obtener lista de amigos (usuarios que sigues)
+async function getFriendsList() {
+    try {
+        if (!user || user.email === 'guest@nexus.local') return [];
+        
+        const follows = await nexusAPI.db.follows.where('followerId').equals(user.email).toArray();
+        return follows.map(follow => follow.followingId);
+    } catch (error) {
+        console.error('Error obteniendo amigos:', error);
+        return [];
+    }
+}
+
+// Renderizar comentarios de un video
+function renderVideoComments(comments) {
+    if (!comments || comments.length === 0) {
+        return '<div class="no-comments">No hay comentarios aún. ¡Sé el primero!</div>';
+    }
+    
+    return comments.map(comment => `
+        <div class="comment-item">
+            <div class="comment-avatar" style="background:${comment.color || '#333'}">
+                ${comment.avatar ? 
+                    `<img src="${comment.avatar}" style="width:100%;height:100%;object-fit:cover">` : 
+                    (comment.name || 'U')[0]}
+            </div>
+            <div class="comment-content">
+                <div class="comment-header">
+                    <strong>${escapeHtml(comment.name || 'Usuario')}</strong>
+                    <small>${timeAgo(comment.createdAt)}</small>
+                </div>
+                <div class="comment-text">${escapeHtml(comment.content)}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Toggle comentarios visibles
+function toggleComments(videoId) {
+    const commentsDiv = document.getElementById(`comments-${videoId}`);
+    const headerDiv = commentsDiv.previousElementSibling;
+    const chevron = headerDiv.querySelector('.fa-chevron-down');
+    
+    if (commentsDiv.style.display === 'none') {
+        commentsDiv.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        commentsDiv.style.display = 'none';
+        chevron.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -792,9 +861,6 @@ async function followUser(userEmail) {
             });
             
             alert('¡Siguiendo!');
-            
-            // Abrir chat automáticamente
-            openChatWithUser(userEmail);
         }
         
         // Refrescar la vista
@@ -803,173 +869,6 @@ async function followUser(userEmail) {
     } catch (error) {
         console.error('Error siguiendo usuario:', error);
         alert('Error siguiendo usuario: ' + error.message);
-    }
-}
-
-// ==================== CHAT Y MENSAJERÍA ====================
-async function openChatWithUser(userEmail) {
-    try {
-        // Buscar información del usuario
-        const targetUser = await nexusAPI.db.users.where('email').equals(userEmail).first();
-        if (!targetUser) {
-            alert('Usuario no encontrado');
-            return;
-        }
-        
-        activeChatUserId = targetUser.id;
-        
-        // Actualizar UI del chat
-        document.getElementById('chatUserName').textContent = targetUser.name;
-        setAvatar(document.getElementById('chatUserAvatar'), targetUser);
-        
-        // Cargar mensajes existentes
-        await renderChatMessages();
-        
-        // Abrir modal de chat
-        openModal('chatModal');
-        
-    } catch (error) {
-        console.error('Error abriendo chat:', error);
-        alert('Error abriendo chat: ' + error.message);
-    }
-}
-
-async function renderChatMessages() {
-    try {
-        if (!activeChatUserId || !user) return;
-        
-        const messages = await nexusAPI.db.chats
-            .where('to').equals(user.email)
-            .and('from').equals(getUserEmailById(activeChatUserId))
-            .or('to').equals(getUserEmailById(activeChatUserId))
-            .and('from').equals(user.email))
-            .orderBy('createdAt')
-            .toArray();
-        
-        const container = document.getElementById('chatMessages');
-        container.innerHTML = messages.map(msg => `
-            <div class="chat-message ${msg.from === user.email ? 'sent' : 'received'}">
-                <div class="message-avatar" style="background: ${msg.fromColor || '#333'}">
-                    ${msg.fromAvatar ? 
-                        `<img src="${msg.fromAvatar}" style="width:100%;height:100%;object-fit:cover">` : 
-                        (msg.fromName || 'U')[0]}
-                </div>
-                <div class="message-content">
-                    <div class="message-text">${escapeHtml(msg.content)}</div>
-                    <div class="message-time">${new Date(msg.createdAt).toLocaleTimeString()}</div>
-                </div>
-            </div>
-        `).join('');
-        
-        // Scroll al final
-        container.scrollTop = container.scrollHeight;
-        
-    } catch (error) {
-        console.error('Error cargando mensajes:', error);
-    }
-}
-
-async function sendMessage() {
-    try {
-        const input = document.getElementById('chatInput');
-        const content = input.value.trim();
-        
-        if (!content || !activeChatUserId || !user) return;
-        
-        const targetUserEmail = getUserEmailById(activeChatUserId);
-        
-        const messageData = {
-            from: user.email,
-            fromName: user.name,
-            fromAvatar: user.pfp,
-            fromColor: user.color,
-            to: targetUserEmail,
-            toName: getUserEmailById(activeChatUserId),
-            content,
-            type: 'text',
-            createdAt: Date.now(),
-            read: false
-        };
-        
-        // Guardar mensaje
-        await nexusAPI.db.chats.add(messageData);
-        
-        // Broadcast del mensaje
-        await nexusAPI.broadcast('client-new_message', messageData);
-        
-        // Limpiar input
-        input.value = '';
-        
-        // Refrescar mensajes
-        await renderChatMessages();
-        
-    } catch (error) {
-        console.error('Error enviando mensaje:', error);
-        alert('Error enviando mensaje: ' + error.message);
-    }
-}
-
-function getUserEmailById(userId) {
-    // Esta función debería buscar el email por ID, pero por ahora usamos un mapeo simple
-    // En una implementación real, esto buscaría en la base de datos
-    return 'user_' + userId + '@nexus.local'; // Placeholder
-}
-
-// ==================== INBOX Y CHATS ====================
-async function renderInbox() {
-    try {
-        if (!user) {
-            document.getElementById('inboxPage').innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">Inicia sesión para ver mensajes</div>';
-            return;
-        }
-        
-        const messages = await nexusAPI.db.chats
-            .where('to').equals(user.email)
-            .orderBy('createdAt')
-            .reverse()
-            .toArray();
-        
-        const container = document.getElementById('inboxPage');
-        
-        if (messages.length === 0) {
-            container.innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">No tienes mensajes</div>';
-            return;
-        }
-        
-        // Agrupar mensajes por usuario
-        const messagesByUser = {};
-        messages.forEach(msg => {
-            const otherUser = msg.from === user.email ? msg.to : msg.from;
-            if (!messagesByUser[otherUser]) {
-                messagesByUser[otherUser] = [];
-            }
-            messagesByUser[otherUser].push(msg);
-        });
-        
-        container.innerHTML = Object.entries(messagesByUser).map(([userEmail, userMessages]) => {
-            const lastMessage = userMessages[0];
-            const unreadCount = userMessages.filter(msg => !msg.read && msg.to === user.email).length;
-            
-            return `
-                <div class="chat-item" onclick="openChatWithUser('${userEmail}')">
-                    <div class="chat-avatar" style="background: ${lastMessage.fromColor || '#333'}">
-                        ${lastMessage.fromAvatar ? 
-                            `<img src="${lastMessage.fromAvatar}" style="width:100%;height:100%;object-fit:cover">` : 
-                            (lastMessage.fromName || 'U')[0]}
-                    </div>
-                    <div class="chat-info">
-                        <div class="chat-name">${escapeHtml(lastMessage.fromName || 'Usuario')}</div>
-                        <div class="chat-preview">${escapeHtml(lastMessage.content)}</div>
-                        <div class="chat-time">${timeAgo(lastMessage.createdAt)}</div>
-                    </div>
-                    ${unreadCount > 0 ? `<div class="unread-badge">${unreadCount}</div>` : ''}
-                </div>
-            `;
-        }).join('');
-        
-    } catch (error) {
-        console.error('Error cargando inbox:', error);
-        document.getElementById('inboxPage').innerHTML = '<div style="text-align: center; padding: 50px; color: #ff3b30;">Error cargando mensajes</div>';
     }
 }
 
@@ -1267,6 +1166,152 @@ function closeModal(id) {
 
 function openCamera() {
     alert('Función de cámara próximamente');
+}
+
+// ==================== BÚSQUEDA DE USUARIOS ====================
+document.addEventListener('DOMContentLoaded', () => {
+    // Configurar búsqueda de usuarios
+    const searchInput = document.getElementById('globalSearch');
+    const resultsBox = document.getElementById('searchResultsBox');
+    
+    if (searchInput && resultsBox) {
+        searchInput.addEventListener('input', async (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            
+            if (query.length < 2) {
+                resultsBox.style.display = 'none';
+                return;
+            }
+            
+            try {
+                // Buscar usuarios en IndexedDB
+                const users = await nexusAPI.db.users
+                    .where('email')
+                    .startsWith(query)
+                    .or('name')
+                    .startsWith(query)
+                    .toArray();
+                
+                // Buscar por email exacto
+                const exactUser = await nexusAPI.db.users
+                    .where('email')
+                    .equals(query)
+                    .first();
+                
+                if (exactUser && !users.find(u => u.email === exactUser.email)) {
+                    users.push(exactUser);
+                }
+                
+                renderSearchResults(users);
+                
+            } catch (error) {
+                console.error('Error buscando usuarios:', error);
+            }
+        });
+        
+        // Cerrar resultados al hacer click fuera
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+                resultsBox.style.display = 'none';
+            }
+        });
+    }
+});
+
+// Renderizar resultados de búsqueda
+function renderSearchResults(users) {
+    const resultsBox = document.getElementById('searchResultsBox');
+    
+    if (users.length === 0) {
+        resultsBox.innerHTML = '<div style="padding: 15px; color: #888; text-align: center;">No se encontraron usuarios</div>';
+        resultsBox.style.display = 'block';
+        return;
+    }
+    
+    resultsBox.innerHTML = users.map(u => `
+        <div class="search-result-item" onclick="selectUserFromSearch('${u.email}')">
+            <div class="search-avatar" style="background: ${u.color || '#333'}">
+                ${u.pfp ? 
+                    `<img src="${u.pfp}" style="width:100%;height:100%;object-fit:cover">` : 
+                    (u.name || 'U')[0]}
+            </div>
+            <div class="search-info">
+                <div class="search-name">${escapeHtml(u.name || 'Usuario')}</div>
+                <div class="search-email">${escapeHtml(u.email)}</div>
+            </div>
+            <div class="search-action">
+                <button class="search-follow-btn" onclick="event.stopPropagation(); followUserFromSearch('${u.email}')">
+                    Seguir
+                </button>
+            </div>
+        </div>
+    `).join('');
+    
+    resultsBox.style.display = 'block';
+}
+
+// Seleccionar usuario de búsqueda
+function selectUserFromSearch(email) {
+    document.getElementById('globalSearch').value = email;
+    document.getElementById('searchResultsBox').style.display = 'none';
+}
+
+// Seguir usuario desde búsqueda
+async function followUserFromSearch(email) {
+    await followUser(email);
+    document.getElementById('searchResultsBox').style.display = 'none';
+    document.getElementById('globalSearch').value = '';
+}
+
+// ==================== SEGUIMIENTO DE USUARIOS ====================
+async function followUser(email) {
+    if (!user || user.email === 'guest@nexus.local') {
+        alert('Inicia sesión para seguir usuarios');
+        return;
+    }
+    
+    if (user.email === email) {
+        alert('No puedes seguirte a ti mismo');
+        return;
+    }
+    
+    try {
+        // Verificar si ya sigue al usuario
+        const existingFollow = await nexusAPI.db.follows
+            .where('followerId')
+            .equals(user.email)
+            .and(follow => follow.followingId === email)
+            .first();
+        
+        if (existingFollow) {
+            // Dejar de seguir
+            await nexusAPI.db.follows.delete(existingFollow.id);
+            await nexusAPI.broadcast('client-unfollow_user', {
+                followerId: user.email,
+                followingId: email
+            });
+            console.log('👋 Dejaste de seguir:', email);
+        } else {
+            // Seguir
+            await nexusAPI.db.follows.add({
+                followerId: user.email,
+                followingId: email,
+                createdAt: Date.now()
+            });
+            await nexusAPI.broadcast('client-follow_user', {
+                followerId: user.email,
+                followingId: email
+            });
+            console.log('👥 Siguiendo a:', email);
+        }
+        
+        // Refrescar UI
+        await renderHome();
+        
+    } catch (error) {
+        console.error('Error siguiendo/dejando de seguir:', error);
+        alert('Error: ' + error.message);
+    }
 }
 
 // ==================== STORIES ====================

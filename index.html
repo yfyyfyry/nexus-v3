@@ -51,6 +51,120 @@
         .act-btn:active { transform: scale(0.8); }
         .active-l { color: var(--accent) !important; }
 
+        /* Comentarios visibles */
+        .comments-section {
+            border-top: 1px solid rgba(255,255,255,0.1);
+            margin-top: 10px;
+        }
+        
+        .comments-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+            border-radius: 8px;
+        }
+        
+        .comments-header:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .comments-header i {
+            color: #888;
+            transition: transform 0.3s;
+        }
+        
+        .comments-header span {
+            flex: 1;
+            color: #888;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .comments-list {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0 15px 15px;
+        }
+        
+        .comment-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+        
+        .comment-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+        
+        .comment-content {
+            flex: 1;
+        }
+        
+        .comment-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        
+        .comment-header strong {
+            color: white;
+            font-size: 13px;
+        }
+        
+        .comment-header small {
+            color: #888;
+            font-size: 11px;
+        }
+        
+        .comment-text {
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .no-comments {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+            font-size: 14px;
+        }
+
+        /* Badge de amigo */
+        .friend-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(135deg, #ff6b6b, #ff8787);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            z-index: 10;
+            box-shadow: 0 2px 8px rgba(255,107,107,0.3);
+        }
+        
+        .friend-video {
+            border: 2px solid #ff6b6b;
+            box-shadow: 0 0 20px rgba(255,107,107,0.2);
+        }
+
         /* STATS STYLE */
         .profile-stats { display: flex; justify-content: center; gap: 30px; margin: 20px 0; }
         .stat-val { display: block; font-weight: 800; font-size: 18px; }

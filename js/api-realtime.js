@@ -328,12 +328,77 @@ class NexusAPI {
         }
     }
 
-    // Notificar nuevo contenido
-    notifyNewContent(type, data) {
-        // Evento personalizado para actualizar UI
+    // Manejar actualizaciones en tiempo real
+    handleRealtimeUpdate(event) {
+        const { type, data } = event;
+        console.log(' Evento recibido:', type, data);
+        
+        // Disparar evento personalizado para la app
         window.dispatchEvent(new CustomEvent('nexus:new_content', {
             detail: { type, data }
         }));
+        
+        // Forzar refresco inmediato de la UI
+        setTimeout(() => {
+            if (type === 'new_video' || type === 'video') {
+                this.refreshVideos();
+            }
+            if (type === 'like_video' || type === 'unlike_video') {
+                this.refreshVideoLikes(data.videoId);
+            }
+            if (type === 'comment_video') {
+                this.refreshVideoComments(data.videoId);
+            }
+        }, 100);
+    }
+    
+    // Refrescar todos los videos
+    async refreshVideos() {
+        try {
+            const videos = await this.getVideos();
+            console.log(' Refrescando videos:', videos.length);
+            
+            // Disparar evento de refresco
+            window.dispatchEvent(new CustomEvent('nexus:refresh_videos', {
+                detail: { videos }
+            }));
+        } catch (error) {
+            console.error('Error refrescando videos:', error);
+        }
+    }
+    
+    // Refrescar likes de un video específico
+    async refreshVideoLikes(videoId) {
+        try {
+            const video = await this.db.videos.where('id').equals(videoId).first();
+            if (video) {
+                console.log(' Refrescando likes del video:', videoId);
+                
+                // Disparar evento de refresco de likes
+                window.dispatchEvent(new CustomEvent('nexus:refresh_likes', {
+                    detail: { videoId, likes: video.likes || [] }
+                }));
+            }
+        } catch (error) {
+            console.error('Error refrescando likes:', error);
+        }
+    }
+    
+    // Refrescar comentarios de un video específico
+    async refreshVideoComments(videoId) {
+        try {
+            const video = await this.db.videos.where('id').equals(videoId).first();
+            if (video) {
+                console.log(' Refrescando comentarios del video:', videoId);
+                
+                // Disparar evento de refresco de comentarios
+                window.dispatchEvent(new CustomEvent('nexus:refresh_comments', {
+                    detail: { videoId, comments: video.comments || [] }
+                }));
+            }
+        } catch (error) {
+            console.error('Error refrescando comentarios:', error);
+        }
     }
 
     // Métodos de API

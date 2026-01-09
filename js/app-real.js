@@ -992,6 +992,66 @@ window.addEventListener('nexus:new_content', async (event) => {
     await renderHome();
 });
 
+// Listener para refresco de videos
+window.addEventListener('nexus:refresh_videos', async (event) => {
+    console.log('🔄 Refrescando videos por evento');
+    await renderHome();
+    await renderShorts();
+});
+
+// Listener para refresco de likes
+window.addEventListener('nexus:refresh_likes', async (event) => {
+    const { videoId, likes } = event.detail;
+    console.log('❤️ Refrescando likes del video:', videoId);
+    
+    // Actualizar botón de like en el DOM
+    const likeButtons = document.querySelectorAll(`[onclick*="toggleLike(${videoId}"]`);
+    likeButtons.forEach(button => {
+        const span = button.querySelector('span');
+        if (span) {
+            span.textContent = formatNumber(likes.length);
+        }
+        
+        // Actualizar estado activo
+        const isLiked = user && likes.includes(user.email);
+        if (isLiked) {
+            button.classList.add('active-l');
+        } else {
+            button.classList.remove('active-l');
+        }
+    });
+});
+
+// Listener para refresco de comentarios
+window.addEventListener('nexus:refresh_comments', async (event) => {
+    const { videoId, comments } = event.detail;
+    console.log('💬 Refrescando comentarios del video:', videoId);
+    
+    // Actualizar contador de comentarios
+    const commentButtons = document.querySelectorAll(`[onclick*="openComments(${videoId}"]`);
+    commentButtons.forEach(button => {
+        const span = button.querySelector('span');
+        if (span) {
+            span.textContent = formatNumber(comments.length);
+        }
+    });
+    
+    // Actualizar sección de comentarios si está visible
+    const commentsSection = document.getElementById(`comments-${videoId}`);
+    if (commentsSection && commentsSection.style.display !== 'none') {
+        commentsSection.innerHTML = renderVideoComments(comments);
+    }
+});
+
+// Forzar sincronización periódica
+setInterval(async () => {
+    if (user && user.email !== 'guest@nexus.local') {
+        console.log('🔄 Sincronización periódica...');
+        await renderHome();
+        await renderShorts();
+    }
+}, 10000); // Cada 10 segundos
+
 // Manejar sincronización de likes
 async function handleLikeSync(data) {
     if (!user || user.email === data.userId) return; // No actualizar si es el mismo usuario
@@ -1098,15 +1158,110 @@ async function renderShorts() {
         const shorts = videos.filter(v => v.type === 'short');
         const container = document.getElementById('shortsPage');
         
-        container.innerHTML = shorts.map(short => `
-            <div class="short-frame">
-                <video src="${short.videoUrl}" loop playsinline onclick="this.paused?this.play():this.pause()"></video>
-            </div>
-        `).join('');
+        if (shorts.length === 0) {
+            container.innerHTML = '<div style="text-align: center; padding: 50px; color: #666;">No hay shorts aún. ¡Sé el primero en subir!</div>';
+            return;
+        }
+        
+        // Obtener lista de amigos
+        const friends = await getFriendsList();
+        
+        container.innerHTML = shorts.map((short, index) => {
+            const isOwnVideo = short.author === (user ? user.email : null);
+            const likesCount = short.likes ? short.likes.length : 0;
+            const commentsCount = short.comments ? short.comments.length : 0;
+            const isLiked = user && user.email !== 'guest@nexus.local' && short.likes && short.likes.includes(user.email);
+            const isFromFriend = friends.includes(short.author);
+            
+            return `
+                <div class="short-frame" data-video-id="${short.id}">
+                    <video src="${short.videoUrl}" loop playsinline onclick="this.paused?this.play():this.pause()"></video>
+                    <div class="short-overlay">
+                        <div class="short-info">
+                            <div class="short-author">
+                                <div class="avatar-v" style="background:${short.authorColor || '#333'}; width: 40px; height: 40px;">
+                                    ${short.authorAvatar ? 
+                                        `<img src="${short.authorAvatar}" style="width:100%;height:100%;object-fit:cover">` : 
+                                        (short.authorName || 'U')[0]}
+                                </div>
+                                <div>
+                                    <strong>${escapeHtml(short.authorName || 'Usuario')}</strong>
+                                    <br>
+                                    <small>${escapeHtml(short.title)}</small>
+                                </div>
+                            </div>
+                            ${isFromFriend ? '<div class="friend-badge">👥 Amigo</div>' : ''}
+                        </div>
+                        
+                        <div class="short-side">
+                            <button class="side-btn ${isLiked ? 'active-l' : ''}" onclick="toggleLike(${short.id}, this)">
+                                <i class="fas fa-heart"></i>
+                                <span>${formatNumber(likesCount)}</span>
+                            </button>
+                            <button class="side-btn" onclick="openComments(${short.id})">
+                                <i class="fas fa-comment"></i>
+                                <span>${formatNumber(commentsCount)}</span>
+                            </button>
+                            <button class="side-btn" onclick="shareVideo(${short.id})">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            ${isOwnVideo ? 
+                                `<button class="side-btn" onclick="deleteVideo(${short.id})" style="color: #ff3b30;">
+                                    <i class="fas fa-trash"></i>
+                                </button>` : 
+                                `<button class="side-btn" onclick="followUser('${short.author}')">
+                                    <i class="fas fa-user-plus"></i>
+                                </button>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Auto-play primer short
+        const firstVideo = container.querySelector('video');
+        if (firstVideo) {
+            firstVideo.play();
+        }
+        
+        // Scroll snap behavior
+        setupShortsScroll();
         
     } catch (error) {
         console.error('Error cargando shorts:', error);
     }
+}
+
+// Configurar scroll behavior para shorts
+function setupShortsScroll() {
+    const container = document.getElementById('shortsPage');
+    let currentShortIndex = 0;
+    const videos = container.querySelectorAll('video');
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const video = entry.target;
+                const frame = video.closest('.short-frame');
+                const index = Array.from(container.querySelectorAll('.short-frame')).indexOf(frame);
+                
+                if (index !== currentShortIndex) {
+                    // Pausar video anterior
+                    if (videos[currentShortIndex]) {
+                        videos[currentShortIndex].pause();
+                    }
+                    
+                    // Reproducir video actual
+                    video.play();
+                    currentShortIndex = index;
+                }
+            }
+        });
+    }, { threshold: 0.7 });
+    
+    // Observar todos los videos
+    videos.forEach(video => observer.observe(video));
 }
 
 function shareVideo(videoId) {

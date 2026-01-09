@@ -263,6 +263,39 @@
         .side-btn.active-l {
             color: var(--accent);
         }
+        
+        .short-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 15;
+        }
+        
+        .play-pause-btn {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.3);
+            color: white;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 20px;
+        }
+        
+        .play-pause-btn:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.5);
+            transform: scale(1.1);
+        }
+        
+        .play-pause-btn:active {
+            transform: scale(0.95);
+        }
 
         /* CHAT */
         .chat-view { position: fixed; inset: 0; background: #000; z-index: 5000; display: none; flex-direction: column; }
@@ -284,6 +317,59 @@
         .modal-box { background: #1c1c1c; width: 100%; max-width: 400px; padding: 25px; border-radius: 30px; border: 1px solid #333; position: relative; }
         .close-modal { position: absolute; top: 20px; right: 20px; color: #888; font-size: 20px; cursor: pointer; }
         .del-btn-mini { color: #ff3b30; font-size: 12px; background: none; border: none; font-weight: bold; cursor: pointer; }
+
+        /* Upload Type Selector */
+        .upload-type-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.05);
+            padding: 5px;
+            border-radius: 15px;
+        }
+        
+        .type-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: #888;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+        }
+        
+        .type-btn.active {
+            background: linear-gradient(45deg, var(--blue), #00d4ff);
+            color: white;
+        }
+        
+        .type-btn i {
+            font-size: 20px;
+        }
+        
+        .upload-modal-content textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #333;
+            background: #050505;
+            color: white;
+            font-size: 14px;
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .upload-modal-content textarea:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 10px rgba(0,149,246,0.3);
+        }
 
         /* RESPONSIVE DESIGN */
         @media (min-width: 768px) {
@@ -452,12 +538,23 @@
 
     <div id="commentModal" class="modal">
         <div class="modal-box">
-            <i class="fas fa-times close-modal" onclick="closeModal('commentModal')" style="cursor:pointer"></i>
-            <h3 style="margin-top: 0;">Comentarios</h3>
-            <div id="commList" style="max-height:300px; overflow-y:auto; margin-bottom:15px; font-size:14px"></div>
-            <div style="display:flex; gap:10px">
-                <input type="text" id="commInput" class="auth-input" placeholder="Escribe un comentario..." style="margin:0">
-                <button class="auth-btn" style="margin:0; width:60px" onclick="postComment()"><i class="fas fa-check"></i></button>
+            <span class="close-modal" onclick="closeModal('commentModal')">&times;</span>
+            <h3>Comentarios</h3>
+            <div id="commList" style="max-height: 300px; overflow-y: auto; margin: 15px 0;"></div>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="commInput" placeholder="Escribe un comentario..." style="flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #333; background: #050505; color: white;">
+                <button onclick="postComment()" style="background: var(--blue); color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 600;">Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="imageModal" class="modal">
+        <div class="modal-box" style="max-width: 90%; max-height: 90%; padding: 0; overflow: hidden;">
+            <span class="close-modal" onclick="closeModal('imageModal')" style="position: absolute; top: 15px; right: 15px; z-index: 1000; background: rgba(0,0,0,0.7); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">&times;</span>
+            <img id="modalImage" style="width: 100%; height: auto; max-height: 70vh; object-fit: contain; background: #000;">
+            <div style="padding: 20px; background: #1c1c1c;">
+                <h3 id="modalImageTitle" style="margin: 0 0 10px 0; color: white;"></h3>
+                <p id="modalImageDescription" style="margin: 0; color: #aaa; font-size: 14px; line-height: 1.4;"></p>
             </div>
         </div>
     </div>

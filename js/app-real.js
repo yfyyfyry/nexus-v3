@@ -542,7 +542,10 @@ async function renderHome() {
             return `
                 <div class="video-card ${isFromFriend ? 'friend-video' : ''}">
                     ${isFromFriend ? '<div class="friend-badge">👥 Amigo</div>' : ''}
-                    <video src="${video.videoUrl}" controls preload="metadata"></video>
+                    ${video.fileType === 'image' ? 
+                        `<img src="${video.imageUrl}" style="width: 100%; display: block; cursor: pointer;" onclick="openImageModal('${video.imageUrl}', '${escapeHtml(video.title)}', '${escapeHtml(video.description || '')}')" />` :
+                        `<video src="${video.videoUrl}" controls preload="metadata"></video>`
+                    }
                     <div class="v-body">
                         <div class="avatar-v" style="background:${video.authorColor || '#333'}">
                             ${video.authorAvatar ? 
@@ -550,8 +553,9 @@ async function renderHome() {
                                 (video.authorName || 'U')[0]}
                         </div>
                         <div style="flex:1">
-                            <b>${escapeHtml(video.title)}</b><br>
-                            <small style="color:#666">${escapeHtml(video.authorName || 'Usuario')} • ${timeAgo(video.createdAt)}</small>
+                            <b>${escapeHtml(video.title)}</b>
+                            ${video.description ? `<br><small style="color:#aaa">${escapeHtml(video.description)}</small>` : ''}
+                            <br><small style="color:#666">${escapeHtml(video.authorName || 'Usuario')} • ${timeAgo(video.createdAt)}</small>
                         </div>
                         ${isOwnVideo ? 
                             `<button class="del-btn-mini" onclick="deleteVideo(${video.id})">Borrar</button>` : 
@@ -700,6 +704,13 @@ async function upContent() {
                     
                     // Broadcast a otros usuarios
                     await nexusAPI.broadcast('client-new_video', { video: videoData });
+                    
+                    // Forzar sincronización inmediata
+                    console.log('🌍 Forzando sincronización global...');
+                    setTimeout(async () => {
+                        await renderHome();
+                        await renderShorts();
+                    }, 500);
                     
                     alert("✅ Video subido exitosamente");
                     closeModal('uploadModal');
@@ -1050,7 +1061,23 @@ setInterval(async () => {
         await renderHome();
         await renderShorts();
     }
-}, 10000); // Cada 10 segundos
+}, 3000); // Cada 3 segundos (más rápido)
+
+// Forzar sincronización al recibir eventos
+window.addEventListener('focus', async () => {
+    console.log('📱 Ventana enfocada - sincronizando...');
+    await renderHome();
+    await renderShorts();
+});
+
+// Forzar sincronización al volver de background
+document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden && user && user.email !== 'guest@nexus.local') {
+        console.log('👁️ Ventana visible - sincronizando...');
+        await renderHome();
+        await renderShorts();
+    }
+});
 
 // Manejar sincronización de likes
 async function handleLikeSync(data) {
@@ -1214,6 +1241,13 @@ async function renderShorts() {
                                 </button>`
                             }
                         </div>
+                        
+                        <!-- Controles de video -->
+                        <div class="short-controls">
+                            <button class="play-pause-btn" onclick="togglePlayPause(this, ${short.id})">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1250,10 +1284,12 @@ function setupShortsScroll() {
                     // Pausar video anterior
                     if (videos[currentShortIndex]) {
                         videos[currentShortIndex].pause();
+                        updatePlayPauseButton(videos[currentShortIndex], false);
                     }
                     
                     // Reproducir video actual
                     video.play();
+                    updatePlayPauseButton(video, true);
                     currentShortIndex = index;
                 }
             }
@@ -1262,6 +1298,43 @@ function setupShortsScroll() {
     
     // Observar todos los videos
     videos.forEach(video => observer.observe(video));
+}
+
+// Función para toggle play/pause
+function togglePlayPause(button, videoId) {
+    const frame = button.closest('.short-frame');
+    const video = frame.querySelector('video');
+    
+    if (video.paused) {
+        video.play();
+        button.innerHTML = '<i class="fas fa-pause"></i>';
+    } else {
+        video.pause();
+        button.innerHTML = '<i class="fas fa-play"></i>';
+    }
+}
+
+// Actualizar botón de play/pause
+function updatePlayPauseButton(video, isPlaying) {
+    const frame = video.closest('.short-frame');
+    const button = frame.querySelector('.play-pause-btn');
+    if (button) {
+        button.innerHTML = isPlaying ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>';
+    }
+}
+
+// Abrir modal de imagen
+function openImageModal(imageUrl, title, description) {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+    const modalTitle = document.getElementById('modalImageTitle');
+    const modalDescription = document.getElementById('modalImageDescription');
+    
+    modalImage.src = imageUrl;
+    modalTitle.textContent = title;
+    modalDescription.textContent = description || 'Sin descripción';
+    
+    modal.style.display = 'flex';
 }
 
 function shareVideo(videoId) {

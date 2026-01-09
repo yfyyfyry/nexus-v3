@@ -585,12 +585,62 @@
         <button class="auth-btn" style="background:none" onclick="closeModal('storyUpModal')">Cerrar</button>
     </div></div>
 
+    <!-- Modal de Ajustes -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-box" style="max-width: 450px;">
+            <span class="close-modal" onclick="closeModal('settingsModal')">&times;</span>
+            <h3>⚙️ Ajustes</h3>
+            
+            <div style="margin: 20px 0;">
+                <h4 style="color: white; margin-bottom: 15px;">📱 Modo de Visualización</h4>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button onclick="setDeviceMode('mobile')" style="background: #333; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; text-align: left;">
+                        <i class="fas fa-mobile-alt"></i> Móvil
+                    </button>
+                    <button onclick="setDeviceMode('tablet')" style="background: #333; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; text-align: left;">
+                        <i class="fas fa-tablet-alt"></i> Tablet
+                    </button>
+                    <button onclick="setDeviceMode('pc')" style="background: #333; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; text-align: left;">
+                        <i class="fas fa-desktop"></i> PC/Escritorio
+                    </button>
+                </div>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <h4 style="color: white; margin-bottom: 15px;">🎨 Tema</h4>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="setTheme('dark')" style="background: #1a1a1a; color: white; border: 2px solid #333; padding: 10px 20px; border-radius: 10px; cursor: pointer; flex: 1;">
+                        <i class="fas fa-moon"></i> Oscuro
+                    </button>
+                    <button onclick="setTheme('light')" style="background: #f0f0f0; color: #333; border: 2px solid #ddd; padding: 10px 20px; border-radius: 10px; cursor: pointer; flex: 1;">
+                        <i class="fas fa-sun"></i> Claro
+                    </button>
+                </div>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <h4 style="color: white; margin-bottom: 15px;">🔄 Actualización Automática</h4>
+                <label style="display: flex; align-items: center; gap: 10px; color: #ccc; cursor: pointer;">
+                    <input type="checkbox" id="autoRefresh" checked style="width: 20px; height: 20px;">
+                    <span>Actualizar contenido automáticamente</span>
+                </label>
+            </div>
+            
+            <div style="margin-top: 25px; text-align: center;">
+                <button onclick="openModal('deviceSelection')" style="background: var(--blue); color: white; border: none; padding: 12px 25px; border-radius: 10px; cursor: pointer; font-weight: 600;">
+                    <i class="fas fa-cog"></i> Configuración Avanzada
+                </button>
+            </div>
+        </div>
+    </div>
+
     <nav>
         <a href="#" class="nav-link active" onclick="changePage('homePage', this)"><i class="fas fa-home"></i></a>
         <a href="#" class="nav-link" onclick="changePage('shortsPage', this)"><i class="fas fa-bolt"></i></a>
         <a href="#" class="nav-link" onclick="openModal('uploadModal')"><i class="fas fa-plus-circle" style="font-size:30px; color:white"></i></a>
         <a href="#" class="nav-link" onclick="changePage('inboxPage', this)"><i class="fas fa-comment"></i></a>
         <a href="#" class="nav-link" onclick="changePage('profilePage', this)"><i class="fas fa-user"></i></a>
+        <a href="#" class="nav-link" onclick="openModal('settingsModal')"><i class="fas fa-cog"></i></a>
     </nav>
 
     <!-- Pusher para sincronización global -->

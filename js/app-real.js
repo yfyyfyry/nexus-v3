@@ -695,41 +695,35 @@ async function upContent() {
                 
                 console.log('Guardando video en IndexedDB...', videoData);
                 
-                try {
-                    const id = await nexusAPI.db.videos.add(videoData);
-                    console.log('Video guardado con ID:', id);
-                    
-                    // Agregar el ID al videoData para sincronización
-                    videoData.id = id;
-                    
-                    // Broadcast a otros usuarios
-                    await nexusAPI.broadcast('client-new_video', { video: videoData });
-                    
-                    // Forzar sincronización inmediata
-                    console.log('🌍 Forzando sincronización global...');
-                    setTimeout(async () => {
-                        await renderHome();
-                        await renderShorts();
-                    }, 500);
-                    
-                    alert("✅ Video subido exitosamente");
-                    closeModal('uploadModal');
-                    
-                    // Limpiar formulario
-                    document.getElementById('vFile').value = '';
-                    document.getElementById('vTitle').value = '';
-                    
-                    // Refrescar la vista
+                const id = await nexusAPI.db.videos.add(videoData);
+                console.log('Video guardado con ID:', id);
+                
+                // Agregar el ID al videoData para sincronización
+                videoData.id = id;
+                
+                // Broadcast a otros usuarios
+                await nexusAPI.broadcast('client-new_video', { video: videoData });
+                
+                // NO forzar sincronización inmediata - dejar que los eventos la manejen
+                console.log('🌍 Contenido subido y broadcast enviado');
+                
+                alert("✅ Video subido exitosamente");
+                closeModal('uploadModal');
+                
+                // Limpiar formulario
+                document.getElementById('vFile').value = '';
+                document.getElementById('vTitle').value = '';
+                
+                // Refrescar solo la vista actual
+                if (document.getElementById('homePage').classList.contains('active-page')) {
                     await renderHome();
-                    
-                } catch (dbError) {
-                    console.error('Error guardando video en IndexedDB:', dbError);
-                    alert("❌ Error guardando video: " + dbError.message);
+                } else if (document.getElementById('shortsPage').classList.contains('active-page')) {
+                    await renderShorts();
                 }
                 
-            } catch (processError) {
-                console.error('Error procesando archivo:', processError);
-                alert("❌ Error procesando archivo: " + processError.message);
+            } catch (dbError) {
+                console.error('Error guardando video en IndexedDB:', dbError);
+                alert("❌ Error guardando video: " + dbError.message);
             }
         };
         
@@ -999,18 +993,18 @@ window.addEventListener('nexus:new_content', async (event) => {
             break;
     }
     
-    // Refrescar la vista principal
-    await renderHome();
+    // NO renderizar automáticamente - solo actualizar contadores específicos
+    // await renderHome();
 });
 
-// Listener para refresco de videos
+// Listener para refresco de videos (solo cuando es necesario)
 window.addEventListener('nexus:refresh_videos', async (event) => {
     console.log('🔄 Refrescando videos por evento');
     await renderHome();
     await renderShorts();
 });
 
-// Listener para refresco de likes
+// Listener para refresco de likes (solo actualiza contadores)
 window.addEventListener('nexus:refresh_likes', async (event) => {
     const { videoId, likes } = event.detail;
     console.log('❤️ Refrescando likes del video:', videoId);
@@ -1033,7 +1027,7 @@ window.addEventListener('nexus:refresh_likes', async (event) => {
     });
 });
 
-// Listener para refresco de comentarios
+// Listener para refresco de comentarios (solo actualiza contadores)
 window.addEventListener('nexus:refresh_comments', async (event) => {
     const { videoId, comments } = event.detail;
     console.log('💬 Refrescando comentarios del video:', videoId);
@@ -1054,16 +1048,16 @@ window.addEventListener('nexus:refresh_comments', async (event) => {
     }
 });
 
-// Forzar sincronización periódica
-setInterval(async () => {
-    if (user && user.email !== 'guest@nexus.local') {
-        console.log('🔄 Sincronización periódica...');
-        await renderHome();
-        await renderShorts();
-    }
-}, 3000); // Cada 3 segundos (más rápido)
+// Forzar sincronización periódica (desactivada para evitar renderizado constante)
+// setInterval(async () => {
+//     if (user && user.email !== 'guest@nexus.local') {
+//         console.log('🔄 Sincronización periódica...');
+//         await renderHome();
+//         await renderShorts();
+//     }
+// }, 3000); // Cada 3 segundos (más rápido)
 
-// Forzar sincronización al recibir eventos
+// Forzar sincronización al recibir eventos (mejorado)
 window.addEventListener('focus', async () => {
     console.log('📱 Ventana enfocada - sincronizando...');
     await renderHome();
@@ -1288,7 +1282,7 @@ function setupShortsScroll() {
                     }
                     
                     // Reproducir video actual
-                    video.play();
+                    video.play().catch(e => console.log('Error reproduciendo video:', e));
                     updatePlayPauseButton(video, true);
                     currentShortIndex = index;
                 }
@@ -1300,14 +1294,17 @@ function setupShortsScroll() {
     videos.forEach(video => observer.observe(video));
 }
 
-// Función para toggle play/pause
+// Función para toggle play/pause (mejorada)
 function togglePlayPause(button, videoId) {
     const frame = button.closest('.short-frame');
     const video = frame.querySelector('video');
     
+    if (!video) return;
+    
     if (video.paused) {
-        video.play();
-        button.innerHTML = '<i class="fas fa-pause"></i>';
+        video.play().then(() => {
+            button.innerHTML = '<i class="fas fa-pause"></i>';
+        }).catch(e => console.log('Error reproduciendo:', e));
     } else {
         video.pause();
         button.innerHTML = '<i class="fas fa-play"></i>';
@@ -1336,6 +1333,209 @@ function openImageModal(imageUrl, title, description) {
     
     modal.style.display = 'flex';
 }
+
+// ==================== MENSAJERÍA DIRECTA ====================
+function openDirectMessage(userEmail) {
+    if (!user || user.email === 'guest@nexus.local') {
+        alert('Inicia sesión para enviar mensajes');
+        return;
+    }
+    
+    // Obtener información del usuario
+    nexusAPI.db.users.where('email').equals(userEmail).first().then(targetUser => {
+        if (targetUser) {
+            // Configurar chat con el usuario
+            activeChatUser = targetUser;
+            
+            // Mostrar información del contacto
+            const chatAvatar = document.getElementById('chatContactAvatar');
+            const chatName = document.getElementById('chatContactName');
+            
+            setAvatar(chatAvatar, targetUser);
+            chatName.textContent = targetUser.name || 'Usuario';
+            
+            // Mostrar vista de chat
+            document.getElementById('chatView').style.display = 'flex';
+            
+            // Cargar mensajes existentes
+            loadChatMessages(user.email, userEmail);
+        }
+    });
+}
+
+// Cargar mensajes del chat
+async function loadChatMessages(fromEmail, toEmail) {
+    try {
+        const messagesFrom = await nexusAPI.db.messages
+            .where('fromEmail').equals(fromEmail)
+            .and(msg => msg.toEmail === toEmail)
+            .toArray();
+            
+        const messagesTo = await nexusAPI.db.messages
+            .where('fromEmail').equals(toEmail)
+            .and(msg => msg.toEmail === fromEmail)
+            .toArray();
+        
+        const allMessages = [...messagesFrom, ...messagesTo].sort((a, b) => a.createdAt - b.createdAt);
+        
+        const msgArea = document.getElementById('msgArea');
+        msgArea.innerHTML = allMessages.map(msg => `
+            <div class="${msg.fromEmail === user.email ? 'msg-me' : 'msg-them'} msg-bubble">
+                ${msg.content}
+            </div>
+        `).join('');
+        
+        // Scroll al final
+        msgArea.scrollTop = msgArea.scrollHeight;
+        
+    } catch (error) {
+        console.error('Error cargando mensajes:', error);
+    }
+}
+
+// Enviar mensaje de texto
+async function sendTextMsg() {
+    const input = document.getElementById('msgInput');
+    const content = input.value.trim();
+    
+    if (!content || !activeChatUser) return;
+    
+    try {
+        const messageData = {
+            fromEmail: user.email,
+            toEmail: activeChatUser.email,
+            content: content,
+            createdAt: Date.now()
+        };
+        
+        // Guardar en IndexedDB
+        await nexusAPI.db.messages.add(messageData);
+        
+        // Broadcast del mensaje
+        await nexusAPI.broadcast('client-new_message', messageData);
+        
+        // Limpiar input
+        input.value = '';
+        
+        // Recargar mensajes
+        loadChatMessages(user.email, activeChatUser.email);
+        
+    } catch (error) {
+        console.error('Error enviando mensaje:', error);
+    }
+}
+
+// Cerrar chat
+function closeChat() {
+    document.getElementById('chatView').style.display = 'none';
+    activeChatUser = null;
+}
+
+// ==================== AJUSTES Y CONFIGURACIÓN ====================
+function setDeviceMode(device) {
+    localStorage.setItem('nexus_device_mode', device);
+    applyDeviceStyles(device);
+    closeModal('settingsModal');
+    alert(`✅ Modo ${device === 'mobile' ? 'Móvil' : device === 'tablet' ? 'Tablet' : 'PC'} activado`);
+}
+
+function setTheme(theme) {
+    localStorage.setItem('nexus_theme', theme);
+    
+    if (theme === 'light') {
+        document.documentElement.style.setProperty('--bg', '#ffffff');
+        document.documentElement.style.setProperty('--card', '#f5f5f5');
+        document.documentElement.style.setProperty('--text', '#000000');
+        document.documentElement.style.setProperty('--border', '#e0e0e0');
+        document.documentElement.style.setProperty('--glass', 'rgba(0, 0, 0, 0.1)');
+    } else {
+        document.documentElement.style.setProperty('--bg', '#000000');
+        document.documentElement.style.setProperty('--card', '#111111');
+        document.documentElement.style.setProperty('--text', '#ffffff');
+        document.documentElement.style.setProperty('--border', '#262626');
+        document.documentElement.style.setProperty('--glass', 'rgba(255, 255, 255, 0.1)');
+    }
+    
+    closeModal('settingsModal');
+    alert(`✅ Tema ${theme === 'light' ? 'Claro' : 'Oscuro'} activado`);
+}
+
+// Aplicar estilos de dispositivo
+function applyDeviceStyles(device) {
+    const root = document.documentElement;
+    
+    if (device === 'pc') {
+        root.style.setProperty('--app-width', '1400px');
+        root.style.setProperty('--nav-height', '70px');
+        root.style.setProperty('--header-padding', '20px 40px');
+        
+        // Estilos específicos para PC
+        document.body.style.maxWidth = '1400px';
+        document.body.style.margin = '0 auto';
+        document.querySelector('.app-header').style.position = 'sticky';
+        
+    } else if (device === 'tablet') {
+        root.style.setProperty('--app-width', '100%');
+        root.style.setProperty('--nav-height', '65px');
+        root.style.setProperty('--header-padding', '15px 30px');
+        
+        document.body.style.maxWidth = '100%';
+        document.body.style.margin = '0';
+        
+    } else {
+        root.style.setProperty('--app-width', '100%');
+        root.style.setProperty('--nav-height', '65px');
+        root.style.setProperty('--header-padding', '12px 20px');
+        
+        document.body.style.maxWidth = '100%';
+        document.body.style.margin = '0';
+    }
+}
+
+// Cargar configuración guardada
+function loadSettings() {
+    const savedDevice = localStorage.getItem('nexus_device_mode') || 'mobile';
+    const savedTheme = localStorage.getItem('nexus_theme') || 'dark';
+    
+    applyDeviceStyles(savedDevice);
+    setTheme(savedTheme);
+}
+
+// Detectar dispositivo automáticamente
+function detectDevice() {
+    const width = window.innerWidth;
+    
+    if (width >= 1024) {
+        return 'pc';
+    } else if (width >= 768) {
+        return 'tablet';
+    } else {
+        return 'mobile';
+    }
+}
+
+// Inicializar configuración al cargar
+document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+    
+    // Detectar cambios de tamaño
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            const autoRefresh = document.getElementById('autoRefresh');
+            if (autoRefresh && autoRefresh.checked) {
+                const detectedDevice = detectDevice();
+                const savedDevice = localStorage.getItem('nexus_device_mode');
+                
+                if (detectedDevice !== savedDevice) {
+                    console.log('📱 Cambio de dispositivo detectado:', detectedDevice);
+                    applyDeviceStyles(detectedDevice);
+                }
+            }
+        }, 250);
+    });
+});
 
 function shareVideo(videoId) {
     // Obtener datos del video

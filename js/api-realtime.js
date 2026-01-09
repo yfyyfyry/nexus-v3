@@ -13,12 +13,12 @@ class NexusAPI {
     async initDB() {
         this.db = new Dexie("NexusDB");
         this.db.version(1).stores({
-            videos: '++id, title, description, videoUrl, type, author, authorName, authorAvatar, authorColor, likes, comments, views, createdAt',
-            stories: '++id, imageUrl, author, authorName, authorAvatar, authorColor, createdAt, expiresAt',
-            chats: '++id, from, fromName, fromAvatar, to, toName, content, type, fileUrl, createdAt, read',
-            users: '++id, name, email, pfp, color, followers, following, createdAt',
+            users: '++id, email, name, color, followers, following, createdAt',
+            videos: '++id, title, description, author, authorName, authorAvatar, authorColor, type, fileType, videoUrl, imageUrl, createdAt, likes, comments, views',
+            stories: '++id, author, authorName, authorAvatar, authorColor, mediaUrl, mediaType, expiresAt, createdAt',
             likes: '++id, videoId, userId, createdAt',
-            follows: '++id, followerId, followingId, createdAt'
+            follows: '++id, followerId, followingId, createdAt',
+            messages: '++id, fromEmail, toEmail, content, createdAt'
         });
     }
 
